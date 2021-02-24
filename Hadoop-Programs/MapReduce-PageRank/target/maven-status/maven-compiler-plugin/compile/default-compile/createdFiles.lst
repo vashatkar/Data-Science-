@@ -1,0 +1,6 @@
+wc/PageRankMR.class
+wc/PageRankReducerClass.class
+wc/InputDataGen.class
+wc/PageRankReducerClass$Counter.class
+wc/Node.class
+wc/PageRankMapperClass.class

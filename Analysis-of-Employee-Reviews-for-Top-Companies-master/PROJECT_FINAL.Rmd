@@ -1,0 +1,1585 @@
+---
+title: "PROJECT_FINAL"
+author: "SRIKANTHBABU"
+date: "15 April 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r TIDYING DATASET}
+
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+#install.packages("ggmap")
+library(ggmap)
+library(caret)
+library(modelr)
+
+#install.packages('installr')
+library(installr)
+
+## install gganimate from GitHub using following code
+# install.packages("devtools")
+library(devtools)
+#install_github("dgrtwo/gganimate")
+
+## install ImageMagick package
+#library(installr)
+#install.ImageMagick()
+#install.packages("gifski")
+
+library(tibble)
+library(lubridate)
+library(maps)
+library(ggthemes)
+library(gganimate)
+library(animation)
+
+## FOR TEXT MINING , install wordcloud2 package from github
+require(devtools)
+# install_github("lchiffon/wordcloud2")
+
+#install.packages("treemap")
+#install.packages("leaflet")
+
+library(treemap)
+library(leaflet)
+
+
+##Using Google ggmap package for obtaining geospatial data of locations and storing it in 
+## file "location_df"
+## use following commented code for getting location data for locations in our 
+## employee reviews dataset from google API.
+
+
+#register_google('Your-google-API-Key')
+
+#Address <- read_data %>% filter(is.na(location) == FALSE) %>% distinct(data, location)
+
+#Address <- as.data.frame(Address)
+
+#locations_df <-  mutate_geocode(Address, location)
+
+#locations_df <- as_tibble(locations_df)
+
+#write.csv(locations_df, "your_file_path_to_store")
+
+
+
+# importing and tidying dataset
+# mention the directory where file is located that is file path in read_csv for
+# both employee reviews dataset and location_df dataset
+read_data <- read_csv("E:/classes resources/DS 5110/project/employee_reviews.csv" , 
+                      guess_max = 1000 ,
+                      na = c("none", "n/a") )
+locations_df <- read.csv("E:/classes resources/DS 5110/project/locations_df.csv") %>% 
+                as.tibble()
+
+
+tidy_data <- read_data %>% full_join(locations_df) %>%
+            select(-X) %>%
+            separate(`job-title` , into=c("job-title","designation"), sep = "-") %>%
+            mutate(dates = mdy(`dates`))
+
+
+
+# data visualisation through leaflet package
+
+
+
+# knowing number of employees in company 
+tidy_data %>% 
+  group_by(company) %>%
+  count()
+
+
+# current and former employees in each company
+tidy_data %>% 
+  group_by(company, `job-title`) %>%
+  count()
+
+
+```
+
+
+```{r data summary for each observation}
+
+data_intro <- tidy_data 
+
+
+#Each company positive and negative overall ratings on map
+data_intro %>% 
+  filter(`company` != "NA",`overall-ratings` != "NA") %>%  
+  mutate(`overall rating` = ifelse(`overall-ratings` > 3 , "Positive" , "Negative")) %>%
+  ggplot() +
+  borders("world", colour = "white", fill = "gray50")+ 
+  geom_point(aes(x = lon, y = lat, colour =`overall rating`)) +
+  scale_color_manual(values = c("red", "green")) + facet_wrap(~company) +theme_void()
+
+########Interactive maps to visualise observations data.
+library(leaflet)
+
+###############Tree Map of jobtitles
+library(treemap)
+#install.packages("treemap")
+title_count <- data_intro %>% group_by(designation) %>% summarize(count = n())%>% arrange(desc(count))
+
+Top_title_count <- title_count[-1,] 
+
+Top_20_title_count <- Top_title_count[1:20,]
+
+treemap(Top_20_title_count,
+        index = "designation",
+        vSize = "count",
+        palette = "RdBu",
+        fontsize.title = 10 )
+
+
+leaflet(Top_title_count) %>% addTiles() %>%
+  addMarkers(lng = ~data_intro$lon, 
+             lat = ~data_intro$lat,
+             clusterOptions = markerClusterOptions(),
+             
+             popup = paste("<b>", "Company :", "</b>", data_intro$company, "<br>",
+                           "<b>", "Employment :","</b>", data_intro$`job-title`, "<br>",
+                           "<b>", "Designation :","</b>" ,data_intro$designation, "<br>",
+                           "<b>", "Overall rating :","</b>" ,data_intro$`overall-ratings`))
+
+
+
+
+```
+
+```{r location vs overall rating }
+
+location_plot_data <- tidy_data
+
+
+#Removing the rows which has 'none' as there rating and location
+location_plot_data <- location_plot_data %>%
+  filter(location != 'NA' )
+  
+#Top Locations to work for in Google
+google <- location_plot_data %>%
+  filter(company == "google") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 41) %>% #1% of total employees (4148)
+  arrange(desc(Mean))
+  
+#Selecting top 5 locations for Google
+googleTop5 <- google[1:5,]
+
+#Bar plot for Google
+ggplot(googleTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="green4") +
+  labs(title="Top 5 Locations to work in Google" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Google
+ggplot(googleTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Google" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+#Top Locations to work for in Amazon
+amazon <- location_plot_data %>%
+  filter(company == "amazon") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 140) %>% # approx less than 1% of total employees (16796)
+  arrange(desc(Mean))
+
+#Selecting top 5 locations for Amazon
+amazonTop5 <- amazon[1:5,]
+
+#Bar plot for Amazon
+ggplot(amazonTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="gold") +
+  labs(title="Top 5 Locations to work in Amazon" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Amazon
+ggplot(amazonTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Amazon" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+#Top Locations to work for in Apple
+apple <- location_plot_data %>%
+  filter(company == "apple") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 75) %>% #1% of total employees (7573)
+  arrange(desc(Mean))
+
+#Selecting top 5 locations for Apple
+appleTop5 <- apple[1:5,]
+
+#Bar plot for Apple
+ggplot(appleTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="black") +
+  labs(title="Top 5 Locations to work in Apple" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Apple
+ggplot(appleTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Apple" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+#Top Locations to work for in Facebook
+facebook <- location_plot_data %>%
+  filter(company == "facebook") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 15) %>% #1% of total employees (1590)
+  arrange(desc(Mean))
+
+#Selecting top 5 locations for Facebook
+facebookTop5 <- facebook[1:5,]
+
+#Bar plot for Facebook
+ggplot(facebookTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="blue") +
+  labs(title="Top 5 Locations to work in Facebook" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Facebook
+ggplot(facebookTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Facebook" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+#Top Locations to work for in Microsoft
+microsoft <- location_plot_data %>%
+  filter(company == "microsoft") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 110) %>% #1% of total employees (11735)
+  arrange(desc(Mean))
+
+#Selecting top 5 locations for Microsoft
+microsoftTop5 <- microsoft[1:5,]
+
+#Bar plot for Microsoft
+ggplot(microsoftTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="orange3") +
+  labs(title="Top 5 Locations to work in Microsoft" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Microsoft
+ggplot(microsoftTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Microsoft" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+#Top Locations to work for in Netflix
+netflixTop5 <- location_plot_data %>%
+  filter(company == "netflix") %>%
+  group_by(location, lon, lat) %>%
+  summarise(Mean = mean(`overall-ratings`), Count = n()) %>% 
+  arrange((Count)) %>%
+  filter(Count > 5) %>% #1% of total employees (562)
+  arrange(desc(Mean))
+
+#Selecting top 5 locations for Microsoft
+netflixTop5 <- netflixTop5[1:5,]
+
+#Bar plot for Netflix
+ggplot(netflixTop5, aes(x = reorder(location, Mean), y = Mean)) +
+  geom_bar(stat = "identity", fill="red") +
+  labs(title="Top 5 Locations to work in Netflix" , x = "Top Locations" , y="Mean of Overall Rating") +
+  coord_flip()
+
+#World map plot for Netflix
+ggplot(netflixTop5, aes(x=lon, y=lat, color=location)) +
+  borders("world", colour = "gray50", fill = "gray50") + 
+  labs(title="Top 5 Locations to work in Netflix" , x = "Longitude" , y="Latitude") +
+  geom_point()
+
+
+
+
+
+```
+
+
+```{r year vs overall rating}
+
+year_read <- tidy_data
+
+year_plot2 <- year_read %>% 
+        mutate(dates = as.character(year_read$dates)) %>%
+        mutate(dates = ifelse(is.na(dates), 0 ,dates)) %>%
+        filter(dates != 0) %>%
+        mutate(year = as.character(year(dates)))
+
+# smooth curve to show yearly variations of overall ratings for each company
+year_plot2 %>%
+  filter(`company` != "NA") %>%
+  ggplot(aes(x= as.numeric(`year`),y = `overall-ratings`)) +
+  geom_smooth(aes( colour=`company`),se=FALSE) +
+  facet_wrap( ~ `company`)+
+  labs(title= "Yearly average ratings for all companies" , x = "year" , y="overall rating") +
+scale_x_continuous(breaks = c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018))+
+  theme(axis.text.x = element_text(angle=45 ,hjust =1)) + 
+  ggsave("year_smooth_curve.jpg")
+
+year_plot1 <- year_read %>% 
+        mutate(dates = as.character(year_read$dates)) %>%
+        mutate(dates = ifelse(is.na(dates), 0 ,dates)) %>%
+        filter(dates != 0) %>%
+        mutate(year = as.character(year(dates)))
+
+# yearly statistics of overall ratings for each company
+year_plot1 %>%
+  filter(`company` != "NA") %>%
+  filter(`year` %in% c("2010":"2018")) %>%
+  ggplot() +
+  geom_boxplot(aes(x=`year`, y =`overall-ratings`, fill = `company`), position = "dodge2")+
+  facet_wrap( ~ `company`) +
+  theme(axis.text.x = element_text(angle=45 ,hjust =1)) +
+  labs(title= "statistics of ratings yearly for all companies" , x = "year" , y="overall rating") +
+ggsave("statistics of ratings yearly.jpg")
+
+
+# plotted through manually calculating the means for each year
+year_plot2 %>%
+  filter(`company` != "NA") %>%
+  group_by(`company`,`year`) %>%
+  summarize(mean_overall = mean(`overall-ratings`)) %>%
+  ggplot(aes(x= as.numeric(`year`),y = `mean_overall`)) +
+  geom_point(aes(colour=`company`)) +
+  geom_line(aes(colour=`company`)) +
+  scale_x_continuous(breaks = c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018))+
+  facet_wrap( ~ `company`)+
+  labs(title= "Yearly average ratings for all companies" , x = "year" , y="mean overall rating") +
+  theme(axis.text.x = element_text(angle=45 ,hjust =1)) + ggsave("year_avg_curve.jpg")
+
+
+# Animated plots for yearly plots (GGSAVE IS USED TO STORE PLOTS )
+
+year_animated <- year_plot2 %>%
+  filter(`company` != "NA") %>%
+  group_by(`company`,`year`,`lon`,`lat`) %>%
+  summarize(mean_overall = mean(`overall-ratings`))
+year_animated
+
+year_animated_amazon <- year_animated %>%
+                        filter(company == "amazon")
+
+year_animated_apple <- year_animated %>%
+                        filter(company == "apple")
+
+year_animated_facebook <- year_animated %>%
+                        filter(company == "facebook")
+
+year_animated_google <- year_animated %>%
+                        filter(company == "google")
+year_animated_microsoft <- year_animated %>%
+                        filter(company == "microsoft")
+year_animated_netflix <- year_animated %>%
+                        filter(company == "netflix")
+
+
+world <- ggplot() +
+  borders("world", colour = "black", fill = "gray80") +
+  borders("state") +
+  theme_map() 
+
+# yearly animated plot for Amazon
+year_map2_amazon <- world +
+  geom_point(year_animated_amazon, 
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)),
+             size= 5 , alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Amazon , year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green") , name = "ratings") 
+
+
+year_map2_amazon <- animate(year_map2_amazon, fps = 20, duration = 10)
+anim_save("amazon1.gif", year_map2_amazon ) 
+
+# yearly animated plot for Apple 
+year_map2_apple  <- world +
+  geom_point(year_animated_apple, 
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)), 
+             size = 5 ,alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Apple, year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green"), name = "ratings") 
+
+year_map2_apple <- animate(year_map2_apple, fps = 20, duration = 10)
+anim_save("apple1.gif", year_map2_apple ) 
+
+
+year_map2_facebook <- world +
+  geom_point(year_animated_facebook,
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)), 
+             size=5, alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Facebook ,year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green"), name = "ratings") 
+  
+animate(year_map2_facebook, fps = 20, duration = 10)
+anim_save("facebook1.gif", year_map2_facebook ) 
+
+
+# yearly animated plot for Google
+year_map2_google <- world +
+  geom_point(year_animated_google,
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)),
+             size= 5 ,alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Google, year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green"), name = "ratings") 
+
+year_map2_google <- animate(year_map2_google, fps = 20, duration = 10)
+anim_save("google1.gif", year_map2_google ) 
+
+
+## yearly animated plot for Microsoft
+year_map2_microsoft <- world +
+  geom_point(year_animated_microsoft,
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)), 
+             size= 5, alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Microsoft, year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green"), name = "ratings") 
+
+year_map2_microsoft <- animate(year_map2_microsoft, fps = 20, duration = 10)
+anim_save("microsoft1.gif", year_map2_microsoft ) 
+
+# yearly animated plot for Netlfix
+year_map2_netflix <- world +
+  geom_point(year_animated_netflix,
+             mapping=aes(x = lon, y = lat, colour = cut_width(`mean_overall`, 1, boundary = 0)),
+             size = 5, alpha = 0.5) +
+  coord_cartesian(xlim = c(-60,-140) , y=c(25,50)) +
+  transition_manual(`year`) +
+  labs(title = "Netflix, year : {current_frame}") +
+  scale_colour_manual(values = c("blue","orange","red","green"), name = "ratings") 
+year_map2_netflix <- animate(year_map2_netflix, fps = 20, duration = 10)
+anim_save("netflix1.gif", year_map2_netflix ) 
+
+year_map2_world <- world +
+  geom_point(year_animated,
+             mapping=aes(x = lon, y = lat, size = `mean_overall`,
+                                        colour= company),  alpha = 0.5) +
+  transition_manual(`year`) +
+  labs(title = "year : {current_frame}") +
+  scale_size_continuous(range = c(0,5), breaks = c(1,2,3,4,5)) +
+  scale_colour_manual(values = c("deepskyblue","coral","darkorange1","red","blue","green"), name = "ratings") 
+year_map2_world <- animate(year_map2_world, fps = 20, duration = 10)
+
+anim_save("world wide animation.gif" , year_map2_world ) 
+
+
+```
+
+
+```{r overall ratings vs other aspects}
+
+general_data <- tidy_data
+
+ general_data <- general_data %>% 
+   filter(`overall-ratings` !="none" & `culture-values-stars`!="none" & `work-balance-stars`!="none" &`carrer-opportunities-stars` !="none" &`comp-benefit-stars`!="none" & `senior-mangemnet-stars`!="none")
+ 
+companynames <- general_data %>% 
+  group_by(company) %>% 
+  summarise(observations = n())
+
+company_overallrating <-general_data %>%
+  group_by(`overall-ratings`,company) %>% 
+  summarise(rating = n())
+ 
+# overall rating proportions each company
+full_join(companynames,company_overallrating) %>% 
+  mutate(fine=rating/observations) %>% 
+  ggplot()+
+  geom_bar(mapping = aes(x=company,y=fine,fill=as.factor( `overall-ratings`)),
+           stat = "identity",position = "dodge")+
+  labs(title="Proportion of overall rating vs Company", x="Company",
+       y="Proportion of overall rating",fill="overall-ratings")
+
+
+company_workbalance <- general_data  %>% 
+  group_by(`work-balance-stars`,company) %>%
+  summarise(total=n())
+full_join(company_workbalance,companynames) %>%
+  mutate(workbalance= total/observations ) %>%
+  ggplot()+geom_bar(mapping = aes(x=company,y=workbalance,fill=as.factor(`work-balance-stars`)),
+                    stat = "identity",position = "dodge")+
+  labs(title="Proportion of Work-Balance-Stars vs Company", x="Company",
+       y="Proportion of Work-Balance-Stars",fill="work-balance-stars")
+
+
+general_data[["dates"]] <- mdy(general_data[["dates"]])
+general_data <- mutate(general_data,year=year(dates))
+general_data <- mutate(general_data,pos= str_sub(general_data[["job-title"]],1,16))
+general_data <- mutate(general_data,pos=str_trim(general_data[["pos"]]))
+
+company_position <-general_data %>% 
+  group_by(pos,company) %>% 
+  summarise(position=n())
+
+ full_join(company_position,companynames) %>%
+   mutate(probability=position/observations) %>% 
+   ggplot()+geom_bar(mapping = aes(x=company,y=probability,fill=pos),
+                     stat = "identity",position = "dodge")+
+   labs(title="Employee Status", x="Company", y="Proportion")
+
+
+positions <- general_data %>% 
+  group_by(company,pos) %>% 
+  summarise(totalpos=n())
+
+overall_pos <- general_data %>% 
+  group_by(company,pos,`overall-ratings`) %>%
+  summarise(eachpos=n())
+
+full_join(positions,overall_pos) %>% mutate(prop=eachpos/totalpos) %>% 
+  ggplot()+
+  geom_bar(mapping = aes(x=pos,y=prop,fill=as.factor(`overall-ratings`),
+                         position = "dodge"),stat = "identity",position = "dodge")+
+  labs(title="Proportion of overall rating vs Employee Status", 
+       x="Employee Status", y="Proportion of overall rating",fill="overall-ratings")+
+  facet_wrap(~company)+coord_flip()
+
+
+
+average<- general_data %>% 
+  gather(`overall-ratings`,`work-balance-stars`,`culture-values-stars`,
+         `carrer-opportunities-stars`,`comp-benefit-stars`,`senior-mangemnet-stars`,
+         key="fields",value = "ratings") %>% group_by(company,fields,ratings) %>% 
+  summarise(totals=n())%>% mutate(prod=as.numeric(ratings)*totals) %>% 
+  group_by(company,fields) %>% summarise(totalsum=sum(prod))
+
+
+
+full_join(average,companynames) %>% group_by(company,fields) %>%
+  mutate(totalratings=totalsum/observations) %>% 
+  ggplot()+geom_bar(mapping = aes(x=company,y=totalratings,fill=company,position = "dodge"),
+                    stat = "identity") +facet_wrap(~fields)+
+  coord_flip()+
+  labs(title="Company vs Average of all six-ratings", y="Average of all six-ratings",
+       x="company",fill="company") + 
+  scale_fill_manual(values = c("gold","black","blue","green4","orange3","red"))
+
+
+average_pos<- general_data %>%
+  gather(`overall-ratings`,`work-balance-stars`,`culture-values-stars`,
+         `carrer-opportunities-stars`,`comp-benefit-stars`,`senior-mangemnet-stars`,
+         key="fields",value = "ratings") %>% group_by(company,fields,ratings,pos) %>%
+  summarise(posavg=n())%>% mutate(product=as.numeric(ratings)*posavg) %>%
+  group_by(company,fields,pos) %>% summarise(numerator=sum(product))
+
+
+
+full_join(companynames,average_pos)  %>% 
+  mutate(totalratings=numerator/observations) %>% 
+  ggplot()+geom_bar(mapping = aes(x=company,y=totalratings,fill=pos),
+                    stat = "identity",position = "dodge") +facet_wrap(~fields)+
+            coord_flip()+
+  labs(title="Company vs Proportion of Average ratings contributed by Current asnd Former Employees",
+       x="Company", y="Average of all six-ratings",fill="position")
+
+
+
+
+
+
+```
+
+
+```{r modelling amazon}
+
+
+library(modelr)
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA") 
+               
+review_train_amazon <- year_read_tidy %>%
+                      filter(`company` == "amazon")
+
+set.seed(3)#reproducibility!
+         
+         
+ggplot(review_train_amazon,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Amazon- Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("amazon plot1.jpg")
+
+
+ggplot(review_train_amazon,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Amazon - Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("amazon plot2.jpg")
+
+ggplot(review_train_amazon,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Amazon- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("amazon plot3.jpg")
+
+ggplot(review_train_amazon,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Amazon- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("amazon plot4.jpg")
+
+ggplot(review_train_amazon,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Amazon- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("amazon plot5.jpg")
+
+lmFit_amazon_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_amazon)
+summary(lmFit_amazon_all)
+
+review_train_amazon %>%
+add_residuals(lmFit_amazon_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Amazon- residuals distribution",
+       x="quantile",
+       y = "residual")
+ggsave("Amazon residual quantile plot new.jpg")
+
+
+# with as factors.
+lmFit_amazon <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) + as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_amazon)
+
+review_train_amazon %>%
+add_residuals(lmFit_amazon) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Amazon- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+
+step(lmFit_amazon)
+
+summary(lmFit_amazon)
+
+
+
+```
+
+
+```{r modelling apple}
+
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA")  
+               
+review_train_apple <- year_read_tidy %>%
+                      filter(`company` == "apple")
+
+
+ggplot(review_train_apple,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Apple- Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("apple plot1.jpg")
+
+ggplot(review_train_apple,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Apple - Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("apple plot2.jpg")
+
+
+ggplot(review_train_apple,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Apple- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("apple plot3.jpg")
+
+ggplot(review_train_apple,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Apple- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("apple plot4.jpg")
+
+ggplot(review_train_apple,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Apple- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("apple plot5.jpg")
+
+
+lmFit_apple_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_apple)
+summary(lmFit_apple_all)
+
+
+review_train_apple %>%
+add_residuals(lmFit_amazon_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Apple- residuals distribution",
+       x="quantile",
+       y = "residual")
+ggsave("Apple residual quantile plot new.jpg")
+
+
+# predictors as factor variables
+
+lmFit_apple <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) + as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_apple)
+
+summary(lmFit_apple)
+
+review_train_apple %>%
+add_residuals(lmFit_apple) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Apple- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+
+
+
+```
+
+
+```{r modelling google}
+
+
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA") 
+               
+review_train_google <- year_read_tidy %>%
+                      filter(`company` == "google")
+
+
+ggplot(review_train_google,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Google- Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("GOOGLE PLOT1.jpg")
+
+
+ggplot(review_train_google,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Google - Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("GOOGLE PLOT2.jpg")
+
+
+ggplot(review_train_google,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Google- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("GOOGLE PLOT3.jpg")
+
+ggplot(review_train_google,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Google- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("GOOGLE PLOT4.jpg")
+
+ggplot(review_train_google,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Google- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("GOOGLE PLOT5.jpg")
+
+
+lmFit_google_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_google)
+summary(lmFit_google_all)
+
+review_train_google %>%
+add_residuals(lmFit_google_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Google- residuals distribution",
+       x="quantile",
+       y = "residual")
+ggsave("GOOGLE residual quantile plot new.jpg")
+
+# predictor variables as factors
+
+lmFit_google <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) + as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_google)
+
+summary(lmFit_google)
+
+review_train_google %>%
+add_residuals(lmFit_google) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Google- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+```
+
+
+
+
+```{r modelling facebook}
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA") 
+               
+review_train_facebook <- year_read_tidy %>%
+                      filter(`company` == "facebook")
+
+         
+ggplot(review_train_facebook,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Facebook- Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("fACEBOOK PLOT1.jpg")
+
+ggplot(review_train_facebook,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Facebook- Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("fACEBOOK PLOT2.jpg")
+
+ggplot(review_train_facebook,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Facebook- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("fACEBOOK PLOT3.jpg")
+
+ggplot(review_train_facebook,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Facebook- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("fACEBOOK PLOT4.jpg")
+
+ggplot(review_train_facebook,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Facebook- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("fACEBOOK PLOT5.jpg")
+
+
+lmFit_facebook_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_facebook)
+summary(lmFit_facebook_all)
+
+review_train_facebook %>%
+add_residuals(lmFit_facebook_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="facebook- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+ggsave("Facebook residual quantile plot new.jpg")
+
+# model with predictors as factor variables
+lmFit_facebook <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) + as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_facebook)
+
+
+summary(lmFit_facebook)
+
+
+review_train_facebook %>%
+add_residuals(lmFit_facebook) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Facebook- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+
+
+```
+
+
+```{r modelling microsoft}
+
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA") 
+               
+review_train_microsoft <- year_read_tidy %>%
+                      filter(`company` == "microsoft")
+
+
+ggplot(review_train_microsoft,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Microsoft - Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("MICROSOFT PLOT1.jpg")
+
+ggplot(review_train_microsoft,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Microsoft - Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("MICROSOFT PLOT2.jpg")
+
+ggplot(review_train_microsoft,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Microsoft- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("MICROSOFT PLOT3.jpg")
+
+ggplot(review_train_microsoft,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Microsoft- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("MICROSOFT PLOT4.jpg")
+
+ggplot(review_train_microsoft,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Microsoft- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("MICROSOFT PLOT5.jpg")
+
+
+lmFit_microsoft_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_microsoft)
+summary(lmFit_microsoft_all)
+
+review_train_microsoft %>%
+add_residuals(lmFit_microsoft_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Microsoft- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+ggsave("Microsoft residual quantile plot new.jpg")
+
+# model with predictors as factor variables
+
+lmFit_microsoft <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) +
+                        as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_microsoft)
+
+summary(lmFit_microsoft)
+
+
+review_train_microsoft %>%
+add_residuals(lmFit_microsoft) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Microsoft- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+```
+
+
+```{r modelling netflix}
+
+
+year_read_tidy <-  tidy_data %>%
+        filter(`work-balance-stars` != "NA",
+               `culture-values-stars` != "NA"   ,     
+               `carrer-opportunities-stars` != "NA" , 
+               `comp-benefit-stars` != "NA" , 
+               `senior-mangemnet-stars`!= "NA") 
+               
+review_train_netflix <- year_read_tidy %>%
+                      filter(`company` == "netflix")
+
+         
+
+ggplot(review_train_netflix,aes(x=as.factor(`work-balance-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Netflix - Overall Rating Against work balance ratings",
+       x="work balance ratings",
+       y = "overall ratings")
+ggsave("Netflix PLOT1.jpg")
+
+ggplot(review_train_netflix,aes(x=as.factor(`culture-values-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot() +
+  labs(title ="Netflix - Overall Rating Against culture values ratings",
+       x="culture values ratings",
+       y = "overall ratings")
+ggsave("Netflix PLOT2.jpg")
+
+ggplot(review_train_netflix,aes(x=as.factor(`carrer-opportunities-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Netflix- Overall Rating Against career opportunities ratings",
+       x="career opportunities ratings",
+       y = "overall ratings")
+ggsave("Netflix PLOT3.jpg")
+
+ggplot(review_train_netflix,aes(x=as.factor(`comp-benefit-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Netflix- Overall Rating Against company benefit ratings",
+       x="comp benefit ratings",
+       y = "overall ratings")
+ggsave("Netflix PLOT4.jpg")
+
+ggplot(review_train_netflix,aes(x=as.factor(`senior-mangemnet-stars`), y=as.numeric(`overall-ratings`)))+
+  geom_boxplot()+
+  labs(title ="Netflix- Overall Rating Against senior management ratings",
+       x="senior managemnet ratings",
+       y = "overall ratings")
+ggsave("Netflix PLOT5.jpg")
+
+
+lmFit_netflix_all <- lm(`overall-ratings` ~ `work-balance-stars` + 
+                         `culture-values-stars`+
+               `carrer-opportunities-stars`+ `comp-benefit-stars` +
+                `senior-mangemnet-stars` ,
+                data = review_train_netflix)
+summary(lmFit_netflix_all)
+
+review_train_netflix %>%
+add_residuals(lmFit_netflix_all) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="netflix- residuals distribution",
+       x="quantile",
+       y = "residual")
+ggsave("Netflix residual quantile plot new.jpg")
+
+# model with predictor variables as factors
+
+lmFit_netflix <- lm(`overall-ratings` ~ as.factor(`work-balance-stars`) + as.factor(`culture-values-stars`)+
+               as.factor(`carrer-opportunities-stars`)+ as.factor(`comp-benefit-stars`) +
+                as.factor(`senior-mangemnet-stars`) ,
+                data = review_train_netflix)
+
+
+summary(lmFit_netflix)
+
+review_train_netflix %>%
+add_residuals(lmFit_netflix) %>%
+ggplot(aes(sample=resid)) +
+geom_qq() +
+  labs(title ="Netflix- residuals distribution",
+       x="quantile",
+       y = "residual")
+
+
+```
+
+
+```{r text data analysis}
+
+
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tokenizers)
+library(tidytext)
+
+data_main <- tidy_data
+
+apple_data <- data_main %>% filter(company == "apple") %>% select(summary)
+amazon_data <- data_main %>% filter(company == "amazon") %>% select(summary)
+google_data <- data_main %>% filter(company == "google") %>% select(summary)
+microsoft_data <- data_main %>% filter(company == "microsoft") %>% select(summary)
+facebook_data <- data_main %>% filter(company == "facebook") %>% select(summary)
+netflix_data <- data_main %>% filter(company == "netflix") %>% select(summary)
+
+amazon_data_former  <- data_main %>% filter(company == "amazon" & `job-title` == "Former Employee ") %>% select(summary) 
+amazon_data_current  <- data_main %>% filter(company == "amazon", `job-title` == "Current Employee ") %>% select(summary)
+apple_data_former     <- data_main %>% filter(company == "apple", `job-title` == "Former Employee ") %>% select(summary)
+apple_data_current     <- data_main %>% filter(company == "apple", `job-title` == "Current Employee ") %>% select(summary)
+
+facebook_data_former  <- data_main %>% filter(company == "facebook", `job-title` == "Former Employee ") %>% select(summary)
+facebook_data_current  <- data_main %>% filter(company == "facebook", `job-title` == "Current Employee ") %>%select(summary)
+google_data_former  <- data_main %>% filter(company == "google", `job-title` == "Former Employee ") %>% select(summary)
+google_data_current  <- data_main %>% filter(company == "google", `job-title` == "Current Employee ") %>% select(summary)
+microsoft_data_former <- data_main %>% filter(company == "microsoft", `job-title` == "Former Employee ") %>% select(summary)
+microsoft_data_current <- data_main %>% filter(company == "microsoft", `job-title` == "Current Employee ")%>%select(summary)
+netflix_data_former   <- data_main %>% filter(company == "netflix", `job-title` == "Former Employee ") %>% select(summary)
+netflix_data_current   <- data_main %>% filter(company == "netflix", `job-title` == "Current Employee ") %>% select(summary)
+
+
+apple_data_former$summary <- tolower(apple_data_former$summary)
+apple_data_current$summary <- tolower(apple_data_current$summary)
+apple_data$summary <- tolower(apple_data$summary)
+
+amazon_data_former$summary <- tolower(amazon_data_former$summary)
+amazon_data_current$summary <- tolower(amazon_data_current$summary)
+amazon_data$summary <- tolower(amazon_data$summary)
+
+microsoft_data_former$summary <- tolower(microsoft_data_former$summary)
+microsoft_data_current$summary <- tolower(microsoft_data_current$summary)
+google_data$summary <- tolower(google_data$summary)
+
+google_data_former$summary <- tolower(google_data_former$summary)
+google_data_current$summary <- tolower(google_data_current$summary)
+microsoft_data$summary <- tolower(microsoft_data$summary)
+
+facebook_data_former$summary <- tolower(facebook_data_former$summary)
+facebook_data_current$summary <- tolower(facebook_data_current$summary)
+facebook_data$summary <- tolower(facebook_data$summary)
+
+netflix_data_former$summary <- tolower(netflix_data_former$summary)
+netflix_data_current$summary <- tolower(netflix_data_current$summary)
+netflix_data$summary <- tolower(netflix_data$summary)
+
+rmv_spcl <- function(docs){
+  for (j in seq(docs)) {
+    docs[[j]] <- gsub("/", "", docs[[j]])
+    docs[[j]] <- gsub("@", "", docs[[j]])
+    docs[[j]] <- gsub("\\|", "", docs[[j]])
+    docs[[j]] <- gsub("\u2028", "", docs[[j]]) 
+    docs[[j]] <- gsub(",","", docs[[j]])
+    docs[[j]] <- gsub("'", "", docs[[j]])
+    docs[[j]] <- gsub("!", "", docs[[j]])
+    docs[[j]] <- gsub("&", "", docs[[j]])
+    docs[[j]] <- gsub("-", "", docs[[j]])
+    return(docs)
+  }
+}
+apple_data_former <- rmv_spcl(apple_data_former)
+apple_data_current <- rmv_spcl(apple_data_current)
+apple_data <- rmv_spcl(apple_data)
+
+amazon_data_former <- rmv_spcl(amazon_data_former)
+amazon_data_current <- rmv_spcl(amazon_data_current)
+amazon_data <- rmv_spcl(amazon_data)
+
+microsoft_data_former <- rmv_spcl(microsoft_data_former)
+microsoft_data_current <- rmv_spcl(microsoft_data_current)
+microsoft_data <- rmv_spcl(microsoft_data)
+
+google_data_former <- rmv_spcl(google_data_former)
+google_data_current <- rmv_spcl(google_data_current)
+google_data <- rmv_spcl(google_data)
+
+facebook_data_former <- rmv_spcl(facebook_data_former)
+facebook_data_current <- rmv_spcl(facebook_data_current)
+facebook_data <- rmv_spcl(facebook_data)
+
+netflix_data_former <- rmv_spcl(netflix_data_former)
+netflix_data_current <- rmv_spcl(netflix_data_current)
+netflix_data <- rmv_spcl(netflix_data)
+
+
+
+
+apple_freq_former <- unnest_tokens(apple_data_former, word, summary)
+apple_freq_current <- unnest_tokens(apple_data_current, word, summary)
+apple_data <- unnest_tokens(apple_data,word,summary)
+
+amazon_freq_former <- unnest_tokens(amazon_data_former, word, summary)
+amazon_freq_current <- unnest_tokens(amazon_data_current, word, summary)
+amazon_data <- unnest_tokens(amazon_data,word,summary)
+
+microsoft_freq_former <- unnest_tokens(microsoft_data_former, word, summary)
+microsoft_freq_current <- unnest_tokens(microsoft_data_current, word, summary)
+google_data <- unnest_tokens(google_data,word,summary)
+
+google_freq_former <- unnest_tokens(google_data_former, word, summary)
+google_freq_current <- unnest_tokens(google_data_current, word, summary)
+microsoft_data <- unnest_tokens(microsoft_data,word,summary)
+
+facebook_freq_former <- unnest_tokens(facebook_data_former, word, summary)
+facebook_freq_current <- unnest_tokens(facebook_data_current, word, summary)
+facebook_data <- unnest_tokens(facebook_data,word,summary)
+
+netflix_freq_former <- unnest_tokens(netflix_data_former, word, summary)
+netflix_freq_current <- unnest_tokens(netflix_data_current, word, summary)
+netflix_data <- unnest_tokens(netflix_data,word,summary)
+
+apple_data_former <-apple_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+apple_data_current <-apple_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+amazon_data_former <-amazon_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+amazon_data_current <-amazon_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+microsoft_data_former <-microsoft_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+microsoft_data_current <-microsoft_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+google_data_former <-google_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+google_data_current <-google_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+facebook_data_former <-facebook_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+facebook_data_current <-facebook_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+netflix_data_former <-netflix_data_former %>% separate(summary, c("word1", "word2"), sep = " ")
+netflix_data_current <-netflix_data_current %>% separate(summary, c("word1", "word2"), sep = " ")
+
+
+rmv_na <- function(data_set){
+  data_set <- data_set  %>% filter(word1 != "NA" | word2 != "NA")
+  data_set <- data_set %>% filter(word2 != "N/A" | word2 != "N/A")
+  return(data_set)
+}
+
+
+apple_data_former <- rmv_na(apple_data_former)
+apple_data_current <- rmv_na(apple_data_current)
+
+amazon_data_former <- rmv_na(amazon_data_former)
+amazon_data_current <- rmv_na(amazon_data_current)
+
+microsoft_data_former <- rmv_na(microsoft_data_former)
+microsoft_data_current <- rmv_na(microsoft_data_current)
+
+google_data_former <- rmv_na(google_data_former)
+google_data_current <- rmv_na(google_data_current)
+
+facebook_data_former <- rmv_na(facebook_data_former)
+facebook_data_current <- rmv_na(facebook_data_current)
+
+netflix_data_former <- rmv_na(netflix_data_former)
+netflix_data_current <- rmv_na(netflix_data_current)
+
+
+
+
+count_bigrams <- function(data_set){
+  data_set <- data_set %>% filter(!word1 %in% stop_words$word) %>% filter(!word2 %in% stop_words$word)
+  data_set<- data_set %>% unite(bigram, word1, word2, sep = " ") %>% count(bigram,sort = TRUE) %>% arrange(desc(n))
+  return(data_set)
+}
+apple_bigrams_former <- count_bigrams(apple_data_former)
+apple_bigrams_current <- count_bigrams(apple_data_current)
+
+amazon_bigrams_former <- count_bigrams(amazon_data_former)
+amazon_bigrams_current <- count_bigrams(amazon_data_current)
+
+microsoft_bigrams_former <- count_bigrams(microsoft_data_former)
+microsoft_bigrams_current <- count_bigrams(microsoft_data_current)
+
+google_bigrams_former <- count_bigrams(google_data_former)
+google_bigrams_current <- count_bigrams(google_data_current)
+
+facebook_bigrams_former <- count_bigrams(facebook_data_former)
+facebook_bigrams_current <- count_bigrams(facebook_data_current)
+
+netflix_bigrams_former <- count_bigrams(netflix_data_former)
+netflix_bigrams_current <- count_bigrams(netflix_data_current)
+
+library(gridExtra)
+#Apple
+p1 <- apple_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "black",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- apple_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "black",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#amazon
+p1 <- amazon_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "gold",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- amazon_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "gold",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#google
+p1 <- google_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "green4",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- google_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "green4",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#microsoft
+p1 <- microsoft_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "orange3",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- microsoft_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "orange3",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#facebook
+p1 <- facebook_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "blue",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- facebook_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "blue",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#netflix
+p1 <- netflix_bigrams_former %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n, fill = "black")) + geom_col(fill = "red",show.legend = FALSE) + ggtitle("Former Employee") + ylab("Bigrams") +xlab("Count") + coord_flip()
+
+p2 <- netflix_bigrams_current %>% top_n(5) %>% mutate(bigram = reorder(bigram,n))%>%ggplot(aes(x = bigram, y = n)) + geom_col(fill = "red",show.legend = FALSE) + ggtitle("Current Employee") + ylab("Bigrams") + xlab("Count") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+
+
+
+
+
+count_word <- function(data_set){
+  neg <- c("company", "apple", "amazon", "microsoft", "facebook", "google", "netflix")
+  data_set <- data_set %>% filter(!word %in% stop_words$word) %>% filter(!word %in% neg)
+  data_set<- data_set %>% count(word,sort = TRUE) %>% arrange(desc(n))
+  return(data_set)
+}
+apple_freq_former <- count_word(apple_freq_former)
+apple_freq_current <- count_word(apple_freq_current)
+
+amazon_freq_former <- count_word(amazon_freq_former)
+amazon_freq_current <- count_word(amazon_freq_current)
+
+microsoft_freq_former <- count_word(microsoft_freq_former)
+microsoft_freq_current <- count_word(microsoft_freq_current)
+
+google_freq_former <- count_word(google_freq_former)
+google_freq_current <- count_word(google_freq_current)
+
+facebook_freq_former <- count_word(facebook_freq_former)
+facebook_freq_current <- count_word(facebook_freq_current)
+
+netflix_freq_former <- count_word(netflix_freq_former)
+netflix_freq_current <- count_word(netflix_freq_current)
+
+library(gridExtra)
+#Apple
+p1 <- apple_freq_former  %>% mutate(word = reorder(word,n))  %>%  top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "black", show.legend = FALSE) + ggtitle("Apple Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- apple_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "black", show.legend = FALSE) + ggtitle("Apple Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#amazon
+p1 <- amazon_freq_former  %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "gold", show.legend = FALSE) + ggtitle("amazon Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- amazon_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "gold", show.legend = FALSE) + ggtitle("amazon Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#microsoft
+p1 <- microsoft_freq_former %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "yellow", show.legend = FALSE) + ggtitle("microsoft Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- microsoft_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "yellow", show.legend = FALSE) + ggtitle("microsoft Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#google
+p1 <- google_freq_former %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "green", show.legend = FALSE) + ggtitle("google Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- google_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "green", show.legend = FALSE) + ggtitle("google Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#facebook
+p1 <- facebook_freq_former %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "blue", show.legend = FALSE) + ggtitle("facebook Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- facebook_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "blue", show.legend = FALSE) + ggtitle("facebook Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+#netflix
+p1 <- netflix_freq_former %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "red", show.legend = FALSE) + ggtitle("netflix Former Employee") + ylab("Words") +xlab("Frequency") + coord_flip()
+
+p2 <- netflix_freq_current %>% mutate(word = reorder(word,n))  %>% top_n(15) %>% ggplot(aes(x = word, y = n)) + geom_col(fill = "red", show.legend = FALSE) + ggtitle("netflix Current Employee") + ylab("Words") + xlab("Frequency") +  coord_flip()
+
+grid.arrange(p1,p2,nrow = 1)
+
+
+
+senti_analysis <- function(data_set,sentiment){
+  
+neg_wrds <- tibble(word = c("never", "no", "not", "without"))
+
+data_set  %>% filter(!word1 %in% neg_wrds$word) %>% 
+inner_join(get_sentiments(sentiment), by = c("word2" = "word"))  %>% 
+group_by(sentiment,word2) %>% summarise(n = n()) %>%  mutate(word2 = reorder(word2,n))  %>% top_n(5) %>%  ggplot(aes(word2, n)) + geom_col(aes(fill = sentiment), show.legend = FALSE)  +
+facet_wrap(~sentiment, scales="free") +
+coord_flip() + ggtitle("Top 5 words in Each Bing Sentiment") + 
+xlab("Words") + ylab("Count") 
+}
+
+
+#Apple
+senti_analysis(apple_data_former,"bing")
+senti_analysis(apple_data_current,"bing")
+
+#amazon
+senti_analysis(amazon_data_former,"bing")
+senti_analysis(amazon_data_current,"bing")
+
+#microsoft
+senti_analysis(microsoft_data_former,"bing")
+senti_analysis(microsoft_data_current,"bing")
+
+#google
+senti_analysis(google_data_former,"bing")
+senti_analysis(google_data_current,"bing")
+
+#facebook
+senti_analysis(facebook_data_former,"bing") 
+senti_analysis(facebook_data_current,"bing")
+
+#netflix
+senti_analysis(netflix_data_former,"bing")
+senti_analysis(netflix_data_current,"bing")
+
+
+apple_data <- count_word(apple_data)
+apple_data <- apple_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+amazon_data <- count_word(amazon_data)
+amazon_data <- amazon_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+google_data <- count_word(google_data)
+google_data <- google_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+microsoft_data <- count_word(microsoft_data)
+microsoft_data <- microsoft_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+facebook_data <- count_word(facebook_data)
+facebook_data <- facebook_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+netflix_data <- count_word(netflix_data)
+netflix_data <- netflix_data %>% mutate(word = reorder(word,n)) %>% top_n(100)
+
+
+#Apple
+library(wordcloud2)
+set.seed(1)
+wordcloud2(apple_data)
+wordcloud2(amazon_data)
+wordcloud2(google_data)
+wordcloud2(microsoft_data)
+wordcloud2(facebook_data)
+wordcloud2(netflix_data)
+
+
+sent_analysis <- function(data_set,sentiment){
+  
+neg_wrds <- tibble(word = c("never", "no", "not", "without"))
+
+data_set  %>% filter(!word1 %in% neg_wrds$word) %>% 
+inner_join(get_sentiments(sentiment), by = c("word2" = "word"))  %>% 
+group_by(sentiment,job_title) %>%  ggplot(aes(sentiment, ..prop..)) + geom_bar(aes(group = job_title , fill= job_title), position = "dodge")  + ggtitle("Negative and Positive Sentiments") + 
+xlab("Sentiment") + ylab("Count") 
+}
+
+
+#Apple
+apple_data_former <- apple_data_former %>% mutate(job_title = "Former Employee" )
+apple_data_current <- apple_data_current %>% mutate(job_title = "Current Employee" )
+apple_main_data <- apple_data_current %>% full_join(apple_data_former)
+sent_analysis(apple_main_data, "bing")
+
+
+#Amazon
+amazon_data_former <- amazon_data_former %>% mutate(job_title = "Former Employee" )
+amazon_data_current <- amazon_data_current %>% mutate(job_title = "Current Employee" )
+amazon_main_data <- amazon_data_current %>% full_join(amazon_data_former)
+sent_analysis(amazon_main_data, "bing")
+
+
+#Microsoft
+microsoft_data_former <- microsoft_data_former %>% mutate(job_title = "Former Employee" )
+microsoft_data_current <- microsoft_data_current %>% mutate(job_title = "Current Employee" )
+microsoft_main_data <- microsoft_data_current %>% full_join(microsoft_data_former)
+sent_analysis(microsoft_main_data, "bing")
+
+#Netflix
+netflix_data_former <- netflix_data_former %>% mutate(job_title = "Former Employee" )
+netflix_data_current <- netflix_data_current %>% mutate(job_title = "Current Employee" )
+netflix_main_data <- netflix_data_current %>% full_join(netflix_data_former)
+sent_analysis(netflix_main_data, "bing")
+
+
+#Google
+google_data_former <- google_data_former %>% mutate(job_title = "Former Employee" )
+google_data_current <- google_data_current %>% mutate(job_title = "Current Employee" )
+google_main_data <- google_data_current %>% full_join(google_data_former)
+sent_analysis(google_main_data, "bing")
+
+#Facebook
+facebook_data_former <- facebook_data_former %>% mutate(job_title = "Former Employee" )
+facebook_data_current <- facebook_data_current %>% mutate(job_title = "Current Employee" )
+facebook_main_data <- facebook_data_current %>% full_join(facebook_data_former)
+sent_analysis(facebook_main_data, "bing")
+
+
+```
+

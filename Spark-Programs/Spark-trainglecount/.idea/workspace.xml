@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="cb20803b-362b-4564-9fdc-020d90280a2c" name="Default Changelist" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CodeStyleSettingsInfer">
+    <option name="done" value="true" />
+  </component>
+  <component name="MavenImportPreferences">
+    <option name="importingSettings">
+      <MavenImportingSettings>
+        <option name="importAutomatically" value="true" />
+      </MavenImportingSettings>
+    </option>
+  </component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="1" />
+  </component>
+  <component name="ProjectId" id="1Y5JCX7kb8H4gn0mD7YUyAMpCu2" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="wc" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/main/scala/wc" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="WordCountMain" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="wc.WordCountMain" />
+      <module name="spark-demo" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="wc.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.WordCountMain" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="cb20803b-362b-4564-9fdc-020d90280a2c" name="Default Changelist" comment="" />
+      <created>1582226394332</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1582226394332</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="440" y="166" width="800" height="717" key="#Intentions" timestamp="1582847310236">
+      <screen x="0" y="23" width="1680" height="965" />
+    </state>
+    <state x="440" y="166" width="800" height="717" key="#Intentions/0.23.1680.965@0.23.1680.965" timestamp="1582847310236" />
+    <state x="632" y="423" width="416" height="159" key="#com.intellij.framework.addSupport.AddSupportForSingleFrameworkDialog" timestamp="1582241562289">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state x="632" y="423" width="416" height="159" key="#com.intellij.framework.addSupport.AddSupportForSingleFrameworkDialog/0.23.1680.958@0.23.1680.958" timestamp="1582241562289" />
+    <state width="1638" height="256" key="GridCell.Tab.0.bottom" timestamp="1582242375954">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state width="1638" height="256" key="GridCell.Tab.0.bottom/0.23.1680.958@0.23.1680.958" timestamp="1582242375954" />
+    <state width="1638" height="256" key="GridCell.Tab.0.center" timestamp="1582242375953">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state width="1638" height="256" key="GridCell.Tab.0.center/0.23.1680.958@0.23.1680.958" timestamp="1582242375953" />
+    <state width="1638" height="256" key="GridCell.Tab.0.left" timestamp="1582242375953">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state width="1638" height="256" key="GridCell.Tab.0.left/0.23.1680.958@0.23.1680.958" timestamp="1582242375953" />
+    <state width="1638" height="256" key="GridCell.Tab.0.right" timestamp="1582242375954">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state width="1638" height="256" key="GridCell.Tab.0.right/0.23.1680.958@0.23.1680.958" timestamp="1582242375954" />
+    <state x="517" y="331" key="com.intellij.ide.util.TipDialog" timestamp="1582951044107">
+      <screen x="0" y="23" width="1680" height="958" />
+    </state>
+    <state x="517" y="331" key="com.intellij.ide.util.TipDialog/0.23.1680.958@0.23.1680.958" timestamp="1582951044107" />
+    <state x="517" y="332" key="com.intellij.ide.util.TipDialog/0.23.1680.960@0.23.1680.960" timestamp="1582942204201" />
+    <state x="517" y="333" key="com.intellij.ide.util.TipDialog/0.23.1680.963@0.23.1680.963" timestamp="1582921681010" />
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup" timestamp="1582831826329">
+      <screen x="0" y="23" width="1680" height="961" />
+    </state>
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup/0.23.1680.961@0.23.1680.961" timestamp="1582831826329" />
+  </component>
+</project>
